@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <!-- jsPDF & AutoTable untuk cetak PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f6f9; color: #333; }
+      .container { max-width: 850px; margin: auto; }
+      .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+      h2, h3 { text-align: center; margin-top: 0; }
+      
+      .stok-box { background-color: #007bff; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; display: none; }
+      .stok-box h4 { margin: 0 0 5px 0; font-weight: normal; }
+      .stok-box div { font-size: 28px; font-weight: bold; }
+      
+      .role-switcher { display: flex; margin-bottom: 20px; border-radius: 6px; overflow: hidden; border: 1px solid #007bff; }
+      .role-btn { flex: 1; padding: 12px; border: none; background: #fff; cursor: pointer; font-size: 16px; font-weight: bold; color: #007bff; }
+      .role-btn.active { background: #007bff; color: white; }
+      
+      .form-row { display: flex; gap: 15px; margin-top: 15px; }
+      .form-group { flex: 1; }
+      
+      label { font-weight: bold; display: block; margin-bottom: 5px; }
+      input, select, button { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+      
+      .durasi-preview { background-color: #e9ecef; border: 1px solid #ced4da; padding: 10px; border-radius: 4px; font-weight: bold; text-align: center; color: #495057; margin-top: 15px; }
+      .btn-user { background-color: #28a745; color: white; border: none; font-weight: bold; margin-top: 20px; cursor: pointer; }
+      .btn-admin { background-color: #dc3545; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+      .btn-secondary { background-color: #6c757d; color: white; border: none; font-weight: bold; margin-top: 10px; cursor: pointer; }
+      .btn-pdf { background-color: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; width: auto; }
+      .btn-delete { background-color: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; width: auto; }
+      .header-tabel { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+      .header-tabel h3 { margin: 0; }
+      
+      #resultUser, #resultAdmin, #resultPin { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; display: none; }
+      .success { background: #d4edda; color: #155724; }
+      .error { background: #f8d7da; color: #721c24; }
+      
+      table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+      th { background-color: #6c757d; color: white; }
+      tr:nth-child(even) { background-color: #f9f9f9; }
+      .loading { text-align: center; color: #666; font-style: italic; }
+      .file-link { display: inline-block; margin: 2px; padding: 2px 6px; background: #e2e3e5; border-radius: 3px; font-size: 11px; color: #007bff; text-decoration: none; }
+      .file-link:hover { text-decoration: underline; background: #d6d8db; }
+      
+      .admin-pin-section { background-color: #fff3cd; border: 1px solid #ffe8a1; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+      .download-box { background-color: #e3f2fd; border: 1px solid #90caf9; padding: 15px; border-radius: 6px; margin-top: 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      
+      <!-- STOK BOX (AUTOMATIS TERSEMBUNYI SAAT ROLE USER, MUNCUL DI ADMIN) -->
+      <div id="stokBoxContainer" class="stok-box">
+        <h4>Estimasi Sisa Stok Solar Saat Ini</h4>
+        <div id="stokDisplay">Memuat...</div>
+      </div>
+      <div class="role-switcher">
+        <button class="role-btn active" onclick="switchRole('user')">ROLE USER</button>
+        <button class="role-btn" onclick="switchRole('admin')">ROLE ADMIN 🔒</button>
+      </div>
+      <!-- FORM USER -->
+      <div id="sectionUser" class="card">
+        <h2>Input Penggunaan Diesel (User)</h2>
+        <form id="userForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="waktuOn">Tanggal & Jam ON:</label>
+              <input type="datetime-local" id="waktuOn" onchange="hitungDurasiOtomatis()" required>
+            </div>
+            <div class="form-group">
+              <label for="waktuOff">Tanggal & Jam OFF:</label>
+              <input type="datetime-local" id="waktuOff" onchange="hitungDurasiOtomatis()" required>
+            </div>
+          </div>
+          <div id="durasiPreview" class="durasi-preview" style="display: none;">
+            Estimasi Durasi: <span id="durasiText">-</span>
+          </div>
+          <label style="margin-top: 15px;" for="mode">Mode Penggunaan:</label>
+          <select id="mode" required>
+            <option value="Pemanasan">Pemanasan</option>
+            <option value="Pemadaman">Pemadaman</option>
+          </select>
+          
+          <button type="submit" class="btn-user">Hitung & Kurangi Stok</button>
+        </form>
+        <div id="resultUser"></div>
+      </div>
+      <!-- FORM ADMIN -->
+      <div id="sectionAdmin" class="card" style="display: none;">
+        <h2>Tambah Stok BBM (Admin)</h2>
+        
+        <form id="adminForm">
+          <div class="admin-pin-section">
+            <label for="adminPinInput">🔒 PIN Otentikasi Admin:</label>
+            <input type="password" id="adminPinInput" placeholder="Masukkan PIN Admin" required>
+            <small style="color: #856404; display: block; margin-top: 4px;">*PIN bawaan awal: <strong>1234</strong></small>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="tglStok">Tanggal & Jam Masuk (Opsional):</label>
+              <input type="datetime-local" id="tglStok">
+              <small style="color: #6c757d;">*Kosongkan jika ingin menggunakan waktu sekarang.</small>
+            </div>
+            <div class="form-group">
+              <label for="jumlahStok">Jumlah Solar Masuk (Liter):</label>
+              <input type="number" id="jumlahStok" step="0.1" placeholder="Contoh: 500" required>
+            </div>
+          </div>
+          
+          <label for="keterangan" style="margin-top: 15px;">Keterangan / Supplier:</label>
+          <input type="text" id="keterangan" placeholder="Contoh: SPBU Central / Supplier A">
+          
+          <label for="lampiranFile" style="margin-top: 15px;">Lampiran Foto Jeriken & Nota (Bisa Multiple File):</label>
+          <input type="file" id="lampiranFile" accept="image/*,.pdf" multiple>
+          <small style="color: #6c757d; display: block; margin-top: 4px;">*Tekan CTRL / SHIFT saat memilih untuk mengunggah beberapa file sekaligus (Max 2MB/file).</small>
+          
+          <button type="submit" id="btnSubmitAdmin" class="btn-admin">Tambah Stok BBM</button>
+        </form>
+        <div id="resultAdmin"></div>
+        <!-- FITUR PERIODE DOWNLOAD REKAPAN -->
+        <div class="download-box">
+          <h3 style="margin-bottom: 10px;">📅 Download Rekapan Berdasarkan Periode</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="startDate">Dari Tanggal:</label>
+              <input type="date" id="startDate">
+            </div>
+            <div class="form-group">
+              <label for="endDate">Sampai Tanggal:</label>
+              <input type="date" id="endDate">
+            </div>
+          </div>
+          <small style="color: #0c5460; display: block; margin-top: 5px;">*Kosongkan kedua tanggal jika ingin mendownload <strong>semua data</strong>.</small>
+          <button type="button" class="btn-pdf" style="margin-top: 10px; width: 100%;" onclick="downloadPDF()">📄 Download Rekapan (PDF)</button>
+        </div>
+        <!-- FITUR UBAH PIN USER & ADMIN -->
+        <hr style="margin-top: 25px; margin-bottom: 20px; border: 0; border-top: 1px solid #ccc;">
+        <h3>🔑 Pengaturan Ubah PIN</h3>
+        <form id="changePinForm">
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label for="targetRolePin">Pilih Role PIN yang Ingin Diubah:</label>
+            <select id="targetRolePin" required>
+              <option value="user">PIN User</option>
+              <option value="admin">PIN Admin</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="pinLama">PIN Saat Ini:</label>
+              <input type="password" id="pinLama" placeholder="PIN Lama" required>
+            </div>
+            <div class="form-group">
+              <label for="pinBaru">PIN Baru:</label>
+              <input type="password" id="pinBaru" placeholder="Min. 4 Digit" required>
+            </div>
+          </div>
+          <button type="submit" class="btn-secondary">Perbarui PIN</button>
+        </form>
+        <div id="resultPin"></div>
+      </div>
+      <!-- TABEL REKAPAN -->
+      <div class="card">
+        <div class="header-tabel">
+          <h3 id="tabelTitle">Rekapan Penggunaan Solar</h3>
+        </div>
+        <div id="tabelContainer">
+          <p class="loading">Memuat data...</p>
+        </div>
+      </div>
+    </div>
+    
+    <script>
+      var currentRole = 'user';
+      var cachedData = null;
+      var activeAdminPin = "";
+      
+      window.onload = function() {
+        refreshAllData();
+      };
+      
+      function switchRole(role) {
+        if (role === 'admin' && currentRole !== 'admin') {
+          var pinPrompt = prompt("Masukkan PIN Admin untuk mengakses Panel Admin:");
+          if (!pinPrompt) return;
+          
+          google.script.run.withSuccessHandler(function(res) {
+            if (res.success) {
+              activeAdminPin = pinPrompt;
+              document.getElementById('adminPinInput').value = pinPrompt;
+              applyRoleChange(role);
+            } else {
+              alert(res.message);
+            }
+          }).verifyAdminPin(pinPrompt);
+        } else {
+          applyRoleChange(role);
+        }
+      }
+      
+      function applyRoleChange(role) {
+        currentRole = role;
+        var btns = document.querySelectorAll('.role-btn');
+        btns[0].classList.toggle('active', role === 'user');
+        btns[1].classList.toggle('active', role === 'admin');
+        
+        document.getElementById('stokBoxContainer').style.display = (role === 'admin') ? 'block' : 'none';
+        document.getElementById('sectionUser').style.display = (role === 'user') ? 'block' : 'none';
+        document.getElementById('sectionAdmin').style.display = (role === 'admin') ? 'block' : 'none';
+        document.getElementById('tabelTitle').innerText = (role === 'user') ? 'Rekapan Penggunaan Solar' : 'Riwayat Penambahan Stok BBM';
+        
+        renderTabel();
+      }
+      
+      function hitungDurasiOtomatis() {
+        var valOn = document.getElementById('waktuOn').value;
+        var valOff = document.getElementById('waktuOff').value;
+        var previewBox = document.getElementById('durasiPreview');
+        var durasiText = document.getElementById('durasiText');
+        if (valOn && valOff) {
+          var tOn = new Date(valOn);
+          var tOff = new Date(valOff);
+          var diffMs = tOff - tOn;
+          var diffMenit = Math.round(diffMs / (1000 * 60));
+          if (diffMenit > 0) {
+            var jam = Math.floor(diffMenit / 60);
+            var sisaMenit = diffMenit % 60;
+            var text = "";
+            if (jam > 0) text += jam + " Jam ";
+            if (sisaMenit > 0 || jam === 0) text += sisaMenit + " Menit";
+            durasiText.innerText = text + " (" + diffMenit + " Menit)";
+            previewBox.style.display = 'block';
+          } else if (diffMenit <= 0) {
+            durasiText.innerText = "Waktu OFF harus setelah Waktu ON!";
+            previewBox.style.display = 'block';
+          }
+        } else {
+          previewBox.style.display = 'none';
+        }
+      }
+      
+      function refreshAllData() {
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (data && data.success) {
+              cachedData = data;
+              document.getElementById('stokDisplay').innerText = data.sisaStok + " Liter";
+              renderTabel();
+            } else {
+              document.getElementById('stokDisplay').innerText = "0.00 Liter";
+              document.getElementById('tabelContainer').innerHTML = "<p style='text-align:center; color:red;'>Gagal memuat: " + (data ? data.error : "Unknown error") + "</p>";
+            }
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('stokDisplay').innerText = "Error";
+            document.getElementById('tabelContainer').innerHTML = "<p style='text-align:center; color:red;'>Error Server: " + err.toString() + "</p>";
+          })
+          .ambilRekapanData();
+      }
+      
+      function renderTabel() {
+        if (!cachedData) return;
+        var container = document.getElementById('tabelContainer');
+        var html = "";
+        if (currentRole === 'user') {
+          var dataP = cachedData.penggunaan;
+          if (!dataP || dataP.length === 0) {
+            container.innerHTML = "<p style='text-align:center;'>Belum ada rekapan penggunaan.</p>";
+            return;
+          }
+          var grouped = {};
+          dataP.forEach(function(item) {
+            var key = (item.tanggalInput && item.tanggalInput !== "-") ? item.tanggalInput.substring(0, 7) : "Lainnya";
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(item);
+          });
+          var namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+          Object.keys(grouped).sort().reverse().forEach(function(key) {
+            var items = grouped[key];
+            var subtotalSolar = 0;
+            var subtotalMenit = 0;
+            var titleBulan = key;
+            if (key.indexOf("-") !== -1) {
+              var parts = key.split("-");
+              var idxBln = parseInt(parts[1], 10) - 1;
+              titleBulan = namaBulan[idxBln] + " " + parts[0];
+            }
+            html += "<div style='margin-top:20px; background:#fff; border:1px solid #cce5ff; border-radius:6px; padding:10px;'>";
+            html += "<h4 style='margin:5px 0 10px 0; color:#004085; text-align:left;'>📅 Periode: " + titleBulan + "</h4>";
+            html += "<table>";
+            html += "<thead><tr><th>Tgl Input</th><th>Waktu ON</th><th>Waktu OFF</th><th>Durasi</th><th>Mode</th><th>Terpakai (L)</th></tr></thead><tbody>";
+            items.forEach(function(item) {
+              subtotalSolar += parseFloat(item.solar) || 0;
+              subtotalMenit += parseInt(item.menit) || 0;
+              html += "<tr>" +
+                        "<td>"+item.tanggalInput+"</td>" +
+                        "<td>"+item.waktuOn+"</td>" +
+                        "<td>"+item.waktuOff+"</td>" +
+                        "<td>"+item.menit+" m ("+item.jam+" j)</td>" +
+                        "<td>"+item.mode+"</td>" +
+                        "<td><strong>"+item.solar+"</strong></td>" +
+                      "</tr>";
+            });
+            var subJam = (subtotalMenit / 60).toFixed(2);
+            html += "<tr style='background-color:#e2e3e5; font-weight:bold;'>" +
+                      "<td colspan='3' style='text-align:right;'>TOTAL PENGURANGAN BULAN INI:</td>" +
+                      "<td>"+subtotalMenit+" m ("+subJam+" j)</td>" +
+                      "<td>-</td>" +
+                      "<td style='color:#dc3545;'>"+subtotalSolar.toFixed(2)+" L</td>" +
+                    "</tr>";
+            html += "</tbody></table></div>";
+          });
+        } else {
+          var dataS = cachedData.stok;
+          if (!dataS || dataS.length === 0) {
+            container.innerHTML = "<p style='text-align:center;'>Belum ada riwayat penambahan stok.</p>";
+            return;
+          }
+          html += "<table><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Masuk (L)</th><th>Lampiran File</th><th>Aksi</th></tr></thead><tbody>";
+          for (var j = 0; j < dataS.length; j++) {
+            var cellLampiran = "-";
+            if (dataS[j].lampiran && dataS[j].lampiran !== "-") {
+              var urls = dataS[j].lampiran.split(" | ");
+              cellLampiran = "";
+              for (var k = 0; k < urls.length; k++) {
+                cellLampiran += "<a href='" + urls[k] + "' target='_blank' class='file-link'>📂 File " + (k+1) + "</a>";
+              }
+            }
+            html += "<tr>" +
+                      "<td>"+dataS[j].tanggal+"</td>" +
+                      "<td>"+dataS[j].keterangan+"</td>" +
+                      "<td><strong>+"+dataS[j].jumlah+"</strong></td>" +
+                      "<td>"+cellLampiran+"</td>" +
+                      "<td><button class='btn-delete' onclick='hapusInputan("+dataS[j].rowIndex+")'>🗑️ Hapus</button></td>" +
+                    "</tr>";
+          }
+          html += "</tbody></table>";
+        }
+        container.innerHTML = html;
+      }
+      
+      function downloadPDF() {
+        if (!cachedData) {
+          alert("Data belum siap untuk di-download.");
+          return;
+        }
+        var sDateVal = document.getElementById('startDate').value;
+        var eDateVal = document.getElementById('endDate').value;
+        var startObj = sDateVal ? new Date(sDateVal + 'T00:00:00') : null;
+        var endObj = eDateVal ? new Date(eDateVal + 'T23:59:59') : null;
+        if (startObj && endObj && startObj > endObj) {
+          alert("Tanggal mulai tidak boleh lebih besar dari tanggal akhir!");
+          return;
+        }
+        var filteredStok = cachedData.stok || [];
+        if (startObj || endObj) {
+          filteredStok = filteredStok.filter(function(item) {
+            var t = new Date(item.tanggal);
+            if (isNaN(t)) return true;
+            if (startObj && t < startObj) return false;
+            if (endObj && t > endObj) return false;
+            return true;
+          });
+        }
+        var filteredPenggunaan = cachedData.penggunaan || [];
+        var totalPemanasan = 0;
+        var totalPemadaman = 0;
+        if (startObj || endObj) {
+          filteredPenggunaan = filteredPenggunaan.filter(function(item) {
+            var t = new Date(item.tanggalInput);
+            if (isNaN(t)) return true;
+            if (startObj && t < startObj) return false;
+            if (endObj && t > endObj) return false;
+            return true;
+          });
+        }
+        filteredPenggunaan.forEach(function(item) {
+          var val = parseFloat(item.solar) || 0;
+          var m = (item.mode || '').toLowerCase();
+          if (m.indexOf('pemanasan') !== -1) {
+            totalPemanasan += val;
+          } else if (m.indexOf('pemadaman') !== -1 || m.indexOf('mati') !== -1) {
+            totalPemadaman += val;
+          }
+        });
+        var totalPenggunaan = totalPemanasan + totalPemadaman;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(16);
+        doc.text("LAPORAN MANAJEMEN BBM SOLAR", 14, 15);
+        
+        doc.setFontSize(10);
+        doc.text("Estimasi Sisa Stok Saat Ini: " + cachedData.sisaStok + " Liter", 14, 22);
+        
+        var txtPeriode = (sDateVal || eDateVal) 
+          ? (sDateVal || "Awal") + " s/d " + (eDateVal || "Akhir")
+          : "Semua Periode";
+        doc.text("Periode Laporan: " + txtPeriode, 14, 27);
+        doc.text("Tanggal Cetak: " + new Date().toLocaleString("id-ID"), 14, 32);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text("Ringkasan Konsumsi BBM (Periode Ini):", 14, 42);
+        doc.setFont(undefined, 'normal');
+        doc.text("• Total Mode Pemanasan: " + totalPemanasan.toFixed(2) + " Liter", 18, 48);
+        doc.text("• Total Mode Pemadaman (Mati Lampu): " + totalPemadaman.toFixed(2) + " Liter", 18, 54);
+        doc.setFont(undefined, 'bold');
+        doc.text("• Total Penggunaan BBM: " + totalPenggunaan.toFixed(2) + " Liter", 18, 60);
+        doc.setFontSize(12);
+        doc.text("1. Riwayat Penambahan Stok BBM", 14, 70);
+        
+        var bodyStok = [];
+        filteredStok.forEach(function(item) {
+          var rawLampiran = item.lampiran || "-";
+          if (rawLampiran !== "-") {
+            var urls = rawLampiran.split(" | ");
+            bodyStok.push([item.tanggal, item.keterangan, item.jumlah + " L", "File 1", urls[0].trim()]);
+            for (var k = 1; k < urls.length; k++) {
+              bodyStok.push(["", "", "", "File " + (k + 1), urls[k].trim()]);
+            }
+          } else {
+            bodyStok.push([item.tanggal, item.keterangan, item.jumlah + " L", "-", "-"]);
+          }
+        });
+        doc.autoTable({
+          startY: 74,
+          head: [['Tanggal', 'Keterangan / Supplier', 'Jumlah Masuk', 'Lampiran']],
+          body: bodyStok.map(row => [row[0], row[1], row[2], row[3]]),
+          headStyles: { fillColor: [220, 53, 69] },
+          styles: { fontSize: 8 },
+          didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 3) {
+              var targetUrl = bodyStok[data.row.index][4];
+              if (targetUrl && targetUrl !== "-") {
+                data.cell.styles.textColor = [0, 102, 204];
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          },
+          didDrawCell: function(data) {
+            if (data.section === 'body' && data.column.index === 3) {
+              var targetUrl = bodyStok[data.row.index][4];
+              if (targetUrl && targetUrl !== "-") {
+                doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: targetUrl });
+              }
+            }
+          }
+        });
+        
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text("2. Detail Rekapan Penggunaan Solar (Per Bulan)", 14, 15);
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text("Periode Laporan: " + txtPeriode, 14, 21);
+        var groupedPDF = {};
+        filteredPenggunaan.forEach(function(item) {
+          var key = (item.tanggalInput && item.tanggalInput !== "-") ? item.tanggalInput.substring(0, 7) : "Lainnya";
+          if (!groupedPDF[key]) groupedPDF[key] = [];
+          groupedPDF[key].push(item);
+        });
+        var bodyPenggunaan = [];
+        Object.keys(groupedPDF).sort().reverse().forEach(function(key) {
+          var items = groupedPDF[key];
+          var subSolar = 0;
+          var subMenit = 0;
+          items.forEach(function(item) {
+            subSolar += parseFloat(item.solar) || 0;
+            subMenit += parseInt(item.menit) || 0;
+            bodyPenggunaan.push([
+              item.tanggalInput,
+              item.waktuOn,
+              item.waktuOff,
+              item.menit + " Min (" + item.jam + " Jam)",
+              item.mode,
+              item.solar + " L"
+            ]);
+          });
+          bodyPenggunaan.push([
+            "TOTAL BULAN " + key,
+            "-",
+            "-",
+            subMenit + " Min (" + (subMenit/60).toFixed(2) + " Jam)",
+            "SUBTOTAL",
+            subSolar.toFixed(2) + " L"
+          ]);
+        });
+        doc.autoTable({
+          startY: 26,
+          head: [['Tgl Input', 'Waktu ON', 'Waktu OFF', 'Durasi', 'Mode', 'Terpakai']],
+          body: bodyPenggunaan,
+          headStyles: { fillColor: [40, 167, 69] },
+          styles: { fontSize: 8 },
+          didParseCell: function(data) {
+            if (data.section === 'body' && data.row.raw[4] === "SUBTOTAL") {
+              data.cell.styles.fillColor = [220, 224, 230];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        });
+        var fileName = "Laporan_BBM_Solar_" + (sDateVal || "All") + "_sd_" + (eDateVal || "All") + ".pdf";
+        doc.save(fileName);
+      }
+      
+      function hapusInputan(rowIndex) {
+        var pinInput = prompt("Masukkan PIN Admin untuk konfirmasi penghapusan data:");
+        if (!pinInput) return;
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res.success) {
+              alert(res.message);
+              refreshAllData();
+            } else {
+              alert("Gagal: " + res.message);
+            }
+          })
+          .hapusStok(rowIndex, pinInput);
+      }
+      
+      // SUBMIT USER (MENGGUNAKAN PIN USER)
+      document.getElementById('userForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        var pinUser = prompt("🔒 Otentikasi Penggunaan:\nMasukkan PIN User untuk memproses input:");
+        if (!pinUser) return;
+        var waktuOn = document.getElementById('waktuOn').value;
+        var waktuOff = document.getElementById('waktuOff').value;
+        var mode = document.getElementById('mode').value;
+        var resDiv = document.getElementById('resultUser');
+        
+        resDiv.style.display = 'block';
+        resDiv.className = '';
+        resDiv.innerHTML = "Memverifikasi PIN & memproses...";
+        
+        google.script.run.withSuccessHandler(function(verifyRes) {
+          if (verifyRes.success) {
+            google.script.run.withSuccessHandler(function(res) {
+              if(res.success) {
+                resDiv.className = 'success';
+                resDiv.innerHTML = "Berhasil disimpan! " + res.durasiMenit + " Menit (" + res.totalSolar + " Liter)";
+                document.getElementById('userForm').reset();
+                document.getElementById('durasiPreview').style.display = 'none';
+                refreshAllData();
+              } else {
+                resDiv.className = 'error';
+                resDiv.innerHTML = res.message;
+              }
+            }).simpanPenggunaan(waktuOn, waktuOff, mode);
+          } else {
+            resDiv.className = 'error';
+            resDiv.innerHTML = verifyRes.message;
+          }
+        }).verifyUserPin(pinUser);
+      });
+      
+      // SUBMIT ADMIN
+      document.getElementById('adminForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var tglInput = document.getElementById('tglStok').value;
+        var jumlah = document.getElementById('jumlahStok').value;
+        var ket = document.getElementById('keterangan').value;
+        var adminPin = document.getElementById('adminPinInput').value;
+        var fileInput = document.getElementById('lampiranFile');
+        var resDiv = document.getElementById('resultAdmin');
+        var btnSubmit = document.getElementById('btnSubmitAdmin');
+        
+        var files = fileInput.files;
+        var MAX_SIZE_PER_FILE = 2 * 1024 * 1024;
+        if (files.length > 0) {
+          for (var i = 0; i < files.length; i++) {
+            if (files[i].size > MAX_SIZE_PER_FILE) {
+              alert("File '" + files[i].name + "' terlalu besar! Maksimal ukuran per file adalah 2 MB.");
+              return;
+            }
+          }
+          resDiv.style.display = 'block';
+          resDiv.className = '';
+          resDiv.innerHTML = "Membaca " + files.length + " file...";
+          btnSubmit.disabled = true;
+          function readFileAsBase64(file) {
+            return new Promise(function(resolve, reject) {
+              var reader = new FileReader();
+              reader.onload = function(evt) {
+                resolve({
+                  fileName: file.name,
+                  mimeType: file.type,
+                  bytes: evt.target.result.split(',')[1]
+                });
+              };
+              reader.onerror = function(err) { reject(err); };
+              reader.readAsDataURL(file);
+            });
+          }
+          var filePromises = Array.from(files).map(readFileAsBase64);
+          Promise.all(filePromises)
+            .then(function(filesData) {
+              kirimDataAdmin(tglInput, jumlah, ket, filesData, adminPin);
+            })
+            .catch(function(err) {
+              btnSubmit.disabled = false;
+              resDiv.className = 'error';
+              resDiv.innerHTML = "Gagal membaca file: " + err.toString();
+            });
+        } else {
+          resDiv.style.display = 'block';
+          resDiv.className = '';
+          btnSubmit.disabled = true;
+          kirimDataAdmin(tglInput, jumlah, ket, [], adminPin);
+        }
+      });
+      
+      function kirimDataAdmin(tglInput, jumlah, ket, filesData, adminPin) {
+        var resDiv = document.getElementById('resultAdmin');
+        var btnSubmit = document.getElementById('btnSubmitAdmin');
+        resDiv.innerHTML = "Mengunggah file ke Drive & menyimpan data...";
+        google.script.run.withSuccessHandler(function(res) {
+          btnSubmit.disabled = false;
+          if(res.success) {
+            resDiv.className = 'success';
+            resDiv.innerHTML = res.message;
+            document.getElementById('tglStok').value = "";
+            document.getElementById('jumlahStok').value = "";
+            document.getElementById('keterangan').value = "";
+            document.getElementById('lampiranFile').value = "";
+            refreshAllData();
+          } else {
+            resDiv.className = 'error';
+            resDiv.innerHTML = res.message;
+          }
+        }).withFailureHandler(function(err){
+          btnSubmit.disabled = false;
+          resDiv.className = 'error';
+          resDiv.innerHTML = "Gagal: " + err.toString();
+        }).tambahStok(tglInput, jumlah, ket, filesData, adminPin);
+      }
+      
+      // FORM UBAH PIN (USER / ADMIN)
+      document.getElementById('changePinForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var targetRole = document.getElementById('targetRolePin').value;
+        var oldPin = document.getElementById('pinLama').value;
+        var newPin = document.getElementById('pinBaru').value;
+        var resDiv = document.getElementById('resultPin');
+        
+        resDiv.style.display = 'block';
+        resDiv.className = '';
+        resDiv.innerHTML = "Memproses perubahan PIN...";
+        
+        if (targetRole === 'user') {
+          google.script.run.withSuccessHandler(function(res) {
+            if (res.success) {
+              resDiv.className = 'success';
+              resDiv.innerHTML = res.message;
+              document.getElementById('pinLama').value = "";
+              document.getElementById('pinBaru').value = "";
+            } else {
+              resDiv.className = 'error';
+              resDiv.innerHTML = res.message;
+            }
+          }).changeUserPin(oldPin, newPin);
+        } else {
+          google.script.run.withSuccessHandler(function(res) {
+            if (res.success) {
+              resDiv.className = 'success';
+              resDiv.innerHTML = res.message;
+              document.getElementById('pinLama').value = "";
+              document.getElementById('pinBaru').value = "";
+              document.getElementById('adminPinInput').value = newPin;
+            } else {
+              resDiv.className = 'error';
+              resDiv.innerHTML = res.message;
+            }
+          }).changeAdminPin(oldPin, newPin);
+        }
+      });
+    </script>
+  </body>
+</html>

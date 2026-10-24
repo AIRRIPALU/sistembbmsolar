@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+      .header { text-align: center; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-bottom: 15px; }
+      .header h2 { margin: 0; color: #28a745; font-size: 18px; }
+      .header p { margin: 5px 0 0 0; font-size: 12px; color: #666; }
+      
+      .summary-box { display: flex; width: 100%; margin-bottom: 20px; }
+      .summary-card { width: 32%; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; text-align: center; float: left; margin-right: 2%; box-sizing: border-box; }
+      .summary-card:last-child { margin-right: 0; }
+      .summary-card h4 { margin: 0 0 5px 0; font-size: 11px; color: #555; }
+      .summary-card div { font-size: 16px; font-weight: bold; }
+      .clear { clear: both; }
+
+      h3 { margin-top: 20px; font-size: 14px; border-left: 4px solid #28a745; padding-left: 8px; color: #333; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: center; font-size: 10px; }
+      th { background-color: #28a745; color: white; text-transform: uppercase; }
+      tr:nth-child(even) { background-color: #f8f9fa; }
+      .footer { margin-top: 30px; text-align: right; font-size: 10px; color: #777; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>LAPORAN REKAPAN LENGKAP BBM SOLAR</h2>
+      <p>Laporan Ringkasan Stok & Penggunaan BBM (Admin Executive Summary)</p>
+    </div>
+
+    <!-- Kotak Ringkasan -->
+    <div class="summary-box">
+      <div class="summary-card">
+        <h4>TOTAL STOK MASUK</h4>
+        <div style="color: #28a745;"><?= totalMasuk ?> L</div>
+      </div>
+      <div class="summary-card">
+        <h4>TOTAL BBM TERPAKAI</h4>
+        <div style="color: #dc3545;"><?= totalKeluar ?> L</div>
+      </div>
+      <div class="summary-card">
+        <h4>SISA STOK SAAT INI</h4>
+        <div style="color: #007bff;"><?= sisaStok ?> L</div>
+      </div>
+      <div class="clear"></div>
+    </div>
+
+    <!-- Tabel 1: Penambahan Stok -->
+    <h3>1. Riwayat Penambahan Stok BBM</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Tanggal & Waktu</th>
+          <th>Keterangan / Supplier</th>
+          <th>Jumlah Masuk (Liter)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <? if (stok && stok.length > 0) { ?>
+          <? stok.forEach(function(item, index) { ?>
+            <tr>
+              <td><?= index + 1 ?></td>
+              <td><?= item.tanggal ?></td>
+              <td><?= item.keterangan ?></td>
+              <td><strong>+<?= item.jumlah ?></strong></td>
+            </tr>
+          <? }); ?>
+        <? } else { ?>
+          <tr><td colspan="4">Belum ada riwayat penambahan stok.</td></tr>
+        <? } ?>
+      </tbody>
+    </table>
+
+    <!-- Tabel 2: Penggunaan BBM -->
+    <h3>2. Riwayat Penggunaan BBM</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Tanggal & Waktu</th>
+          <th>Jam ON</th>
+          <th>Jam OFF</th>
+          <th>Durasi</th>
+          <th>Mode</th>
+          <th>Terpakai (Liter)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <? if (penggunaan && penggunaan.length > 0) { ?>
+          <? penggunaan.forEach(function(item, index) { ?>
+            <tr>
+              <td><?= index + 1 ?></td>
+              <td><?= item.tanggal ?></td>
+              <td><?= item.jamOn ?></td>
+              <td><?= item.jamOff ?></td>
+              <td><?= item.menit ?> min (<?= item.jam ?> j)</td>
+              <td><?= item.mode ?></td>
+              <td><strong><?= item.solar ?></strong></td>
+            </tr>
+          <? }); ?>
+        <? } else { ?>
+          <tr><td colspan="7">Belum ada riwayat penggunaan BBM.</td></tr>
+        <? } ?>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      Dicetak secara otomatis oleh sistem (Admin Report)
+    </div>
+  </body>
+</html>
